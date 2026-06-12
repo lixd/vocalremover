@@ -1,0 +1,25 @@
+:root {
+  /* Colors - matching vocalremover.org */
+  --color-bg-primary: #17171e;
+  --color-bg-secondary: #1e1e28;
+  --color-text-primary: #eeeeee;
+  --color-text-secondary: #d8d8e2;
+  --color-border: #2a2a40;
+  --color-accent: #665DC3;
+  --color-active-bg: #2a2a40;
+  --color-active-text: #ffffff;
+  --color-error: #ff6b6b;
+  --color-upload-border: #665DC3;
+
+  /* Typography */
+  --font-family: 'Source Sans Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+  /* Sidebar */
+  --sidebar-width: 80px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-primary);
+}

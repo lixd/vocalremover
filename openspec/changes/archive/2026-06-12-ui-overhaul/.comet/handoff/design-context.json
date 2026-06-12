@@ -1,0 +1,13 @@
+{
+  "change": "ui-overhaul",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "50b7f3faba774d7478bf0b7b980d3a2eca15dba1481cbb159afc759bdb1e43be",
+  "files": [
+    { "path": "openspec/changes/ui-overhaul/proposal.md", "sha256": "d56fb465abca7c01cd81bd491f0db341a1bb3433626cda9d4d63b9ec5a030f90" },
+    { "path": "openspec/changes/ui-overhaul/design.md", "sha256": "6ff3ae5d8276c009f51f1e04035e96fd0d787894e7941d99d5e52d9ec9f0cc95" },
+    { "path": "openspec/changes/ui-overhaul/tasks.md", "sha256": "97507381f48244083f75b349c8137237648337b084122df8ecd82b3356f7996a" }
+  ]
+}

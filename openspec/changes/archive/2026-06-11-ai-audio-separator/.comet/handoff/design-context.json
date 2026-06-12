@@ -1,0 +1,14 @@
+{
+  "change": "ai-audio-separator",
+  "phase": "design",
+  "mode": "compact",
+  "canonical_spec": "openspec",
+  "generated_by": "comet-handoff.sh",
+  "context_hash": "21413c3a8daf50ec3b467fa92b2f75c33ded238fabc4e52a50050c33c6f0e838",
+  "files": [
+    { "path": "openspec/changes/ai-audio-separator/proposal.md", "sha256": "a0d7220854530ecb9ee562b55fea69a7635eb26078ce04cdf400fa59b31289c1" },
+    { "path": "openspec/changes/ai-audio-separator/design.md", "sha256": "ea00d15301500ade0ca3dcc32f60a5dd205156170ed85669e1d9d3130d307da7" },
+    { "path": "openspec/changes/ai-audio-separator/tasks.md", "sha256": "45c9cd6883115b6e16abc2a871e779debaf816795efa2051e2b3b02fba3526d3" },
+    { "path": "openspec/changes/ai-audio-separator/specs/audio-separation/spec.md", "sha256": "f78070dfd47badccc87ad29bfb97ceb4c1a66120a1a4df622a488b31acb3703e" }
+  ]
+}
