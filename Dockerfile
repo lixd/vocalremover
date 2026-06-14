@@ -39,4 +39,4 @@ RUN mkdir -p /app/media
 EXPOSE 8000
 
 # Default command: gunicorn for production
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4"]
+CMD [".venv/bin/gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4"]
