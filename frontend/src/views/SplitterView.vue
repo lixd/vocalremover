@@ -2,12 +2,10 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import FileUploader from '@/components/FileUploader.vue'
-import ModeSelector from '@/components/ModeSelector.vue'
 import { createTask } from '@/api/client'
 
 const router = useRouter()
 const selectedFile = ref<File | null>(null)
-const mode = ref<'2stems' | '4stems'>('4stems')
 const isUploading = ref(false)
 const error = ref<string | null>(null)
 
@@ -20,7 +18,7 @@ async function handleSubmit() {
   try {
     const formData = new FormData()
     formData.append('file', selectedFile.value)
-    formData.append('mode', mode.value)
+    formData.append('mode', '2stems')
 
     const task = await createTask(formData)
     router.push({ name: 'result', params: { taskId: task.id } })
@@ -40,15 +38,11 @@ function handleFileSelected(file: File) {
   <div class="splitter-view">
     <header class="page-header">
       <h1 class="title">AI 分离器</h1>
-      <h3 class="subtitle">将歌曲分离为多个独立音轨</h3>
+      <h3 class="subtitle">将歌曲分离为人声和伴奏</h3>
     </header>
 
     <div class="upload-card">
       <FileUploader @file-selected="handleFileSelected" />
-
-      <div class="options-row">
-        <ModeSelector v-model="mode" />
-      </div>
 
       <button
         class="submit-btn"
@@ -65,8 +59,8 @@ function handleFileSelected(file: File) {
     <section class="description-section">
       <h2 class="section-title">智能音轨分离</h2>
       <p class="section-text">
-        通过先进的人工智能技术，将歌曲智能分离为多个独立音轨。支持人声、鼓、贝斯、
-        其他乐器等多轨分离，为您提供专业级的音轨拆分结果，适用于混音、采样、学习等场景。
+        通过先进的人工智能技术，将歌曲智能分离为人声和伴奏两个独立音轨。
+        适用于卡拉OK、翻唱、混音、采样等场景。
       </p>
     </section>
   </div>
@@ -106,11 +100,6 @@ function handleFileSelected(file: File) {
   display: flex;
   flex-direction: column;
   gap: 24px;
-}
-
-.options-row {
-  display: flex;
-  justify-content: center;
 }
 
 .submit-btn {

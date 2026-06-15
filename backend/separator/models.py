@@ -12,7 +12,6 @@ class Task(models.Model):
 
     class Mode(models.TextChoices):
         TWO_STEMS = "2stems"
-        FOUR_STEMS = "4stems"
 
     id = models.UUIDField(primary_key=True, default=uuid4, editable=False)
     status = models.CharField(

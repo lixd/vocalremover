@@ -19,11 +19,11 @@ RUN uv sync --no-dev
 # Copy backend source
 COPY backend/ ./
 
-# Pre-download Spleeter model (4stems only; 2stems is derived from it)
+# Pre-download Spleeter model
 RUN uv run python -c "\
 from spleeter.separator import Separator; \
 import numpy as np; \
-s = Separator('spleeter:4stems'); \
+s = Separator('spleeter:2stems'); \
 s.separate(np.random.randn(44100 * 10, 2).astype(np.float32)); \
 print('Model downloaded successfully')"
 
