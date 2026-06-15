@@ -9,51 +9,96 @@ This guide covers deploying VocalRemover using Docker on Linux x86_64 servers.
 - 4GB+ RAM (Spleeter + TensorFlow requirement)
 - 10GB+ disk space (models + images)
 
-## Docker Image Overview
+## Architecture
 
-The application is split into two Docker images:
+The application runs as **three containers**:
 
-| Image | Description |
-|-------|-------------|
-| `vocalremover-backend` | Django API + background worker + Spleeter AI engine |
-| `vocalremover-frontend` | nginx serving Vue.js static files + reverse proxy |
+| Container | Description |
+|-----------|-------------|
+| `vocalremover-backend` | Django API server (gunicorn) |
+| `vocalremover-worker` | Background audio separation worker (polls DB for tasks) |
+| `vocalremover-frontend` | nginx serving Vue.js static files + reverse proxy to backend |
+
+Backend and worker share the same Docker image, differentiated by the `WORKER_MODE` environment variable. They share a data volume for SQLite database and media files.
 
 **Key feature:** Spleeter models are pre-baked into the backend image during build, eliminating runtime model downloads.
 
-## Quick Deployment
+## Quick Deployment (Pre-built Images)
 
-### 1. Clone and Configure
+### 1. Create Project Directory
 
 ```bash
-git clone https://github.com/youruser/vocalremover.git
-cd vocalremover
-cp .env.example .env
+mkdir vocalremover && cd vocalremover
 ```
 
-Edit `.env` with your settings:
-```bash
-DJANGO_SECRET_KEY=your-random-secret-key
-DJANGO_ALLOWED_HOSTS=your-domain.com
-FRONTEND_PORT=80
+### 2. Create docker-compose.yml
+
+```yaml
+services:
+  backend:
+    image: lixd96/vocalremover-backend:latest
+    container_name: vocalremover-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend-data:/app/media
+    environment:
+      - DJANGO_SECRET_KEY=your-random-secret-key
+      - DJANGO_DEBUG=false
+      - DJANGO_ALLOWED_HOSTS=*
+
+  worker:
+    image: lixd96/vocalremover-backend:latest
+    container_name: vocalremover-worker
+    restart: unless-stopped
+    volumes:
+      - backend-data:/app/media
+    environment:
+      - WORKER_MODE=worker
+      - DJANGO_SECRET_KEY=your-random-secret-key
+      - DJANGO_DEBUG=false
+      - DJANGO_ALLOWED_HOSTS=*
+    depends_on:
+      - backend
+
+  frontend:
+    image: lixd96/vocalremover-frontend:latest
+    container_name: vocalremover-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  backend-data:
 ```
 
-### 2. Start Services
+> **For servers in China:** Replace `lixd96/` with your Docker Hub mirror prefix, e.g. `xdel6itq0zfw8s.xuanyuan.run/lixd96/`. Make sure Docker daemon is configured with `registry-mirrors` in `/etc/docker/daemon.json`.
+
+### 3. Start Services
 
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
-### 3. Verify
+The backend container automatically runs database migrations on startup. No manual initialization needed.
+
+### 4. Verify
 
 ```bash
-# Check containers are running
-docker-compose ps
+# Check all three containers are running
+docker compose ps
 
-# Check backend health
+# Check backend API
 curl http://localhost:8000/api/tasks/
 
 # Check frontend
 curl http://localhost
+
+# Check worker logs
+docker logs vocalremover-worker
 ```
 
 ## Building Images Locally
@@ -80,10 +125,10 @@ docker build -t vocalremover-frontend ./frontend
 1. Stage 1: Compiles Vue.js app with Node.js 22
 2. Stage 2: Copies built assets to nginx:alpine
 
-### Docker Compose Build
+### Build All and Start
 
 ```bash
-docker-compose up --build
+docker compose up --build -d
 ```
 
 ## Spleeter Model Service
@@ -97,23 +142,11 @@ Spleeter uses pre-trained TensorFlow models for audio separation:
 
 ### Model Pre-baking
 
-Models are downloaded during Docker image build and baked into the image:
-
-```dockerfile
-# This runs during docker build
-RUN python -c "from spleeter.separator import Separator; ..."
-```
-
-**Benefits:**
-- No runtime downloads
-- Faster container startup
-- Works in air-gapped environments
+Models are downloaded during Docker image build and baked into the image. No runtime downloads needed.
 
 **Model size:** ~200-400MB added to image
 
 ### Manual Model Download (Optional)
-
-If you need to pre-download models without Docker:
 
 ```bash
 cd backend
@@ -121,30 +154,30 @@ python -c "
 from spleeter.separator import Separator
 import numpy as np
 
-# Download 2-stem model
-s = Separator('spleeter:2stems')
-s.separate(np.random.randn(1, 44100 * 10, 2).astype(np.float32))
+s2 = Separator('spleeter:2stems')
+s2.separate(np.random.randn(44100 * 10, 2).astype(np.float32))
 
-# Download 4-stem model
-s = Separator('spleeter:4stems')
-s.separate(np.random.randn(1, 44100 * 10, 2).astype(np.float32))
+s4 = Separator('spleeter:4stems')
+s4.separate(np.random.randn(44100 * 10, 2).astype(np.float32))
 
-print('Models downloaded to cache')
+print('Models downloaded')
 "
 ```
-
-Models are cached in `~/.spleeter/` or Python's cache directory.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DJANGO_SECRET_KEY` | `django-insecure-dev-key...` | Django secret key (CHANGE THIS!) |
+| `DJANGO_SECRET_KEY` | `django-insecure-dev-key...` | Django secret key (**CHANGE THIS!**) |
 | `DJANGO_DEBUG` | `false` | Enable debug mode |
 | `DJANGO_ALLOWED_HOSTS` | `*` | Comma-separated allowed hosts |
 | `FRONTEND_PORT` | `80` | Port for frontend access |
+| `BACKEND_PORT` | `8000` | Port for backend API |
+| `WORKER_MODE` | - | Set to `worker` to run as worker instead of API server |
+| `DOCKER_REGISTRY` | `lixd96` | Docker Hub account/registry prefix |
+| `IMAGE_TAG` | `latest` | Image tag to pull |
 | `DOCKERHUB_USERNAME` | - | Docker Hub username (CI only) |
-| `DOCKERHUB_PASSWORD` | - | Docker Hub token (CI only) |
+| `DOCKERHUB_PASSWORD` | - | Docker Hub password (CI only) |
 
 ## Production Recommendations
 
@@ -163,14 +196,12 @@ Models are cached in `~/.spleeter/` or Python's cache directory.
 
 ### Performance
 
-1. **Increase gunicorn workers:**
-   ```yaml
-   # In docker-compose.yml
-   command: gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers 4 --threads 8
-   ```
+1. **Increase gunicorn workers** for high-traffic deployments
 
-2. **Add volume for media persistence:**
-   Already configured in docker-compose.yml
+2. **Scale workers** — add more worker containers if separation tasks queue up:
+   ```bash
+   docker compose up -d --scale worker=2
+   ```
 
 3. **Enable Docker layer caching** in CI (already configured)
 
@@ -178,14 +209,26 @@ Models are cached in `~/.spleeter/` or Python's cache directory.
 
 ```bash
 # View logs
-docker-compose logs -f backend
-docker-compose logs -f frontend
+docker compose logs -f backend
+docker compose logs -f worker
+docker compose logs -f frontend
 
 # Check resource usage
 docker stats
 ```
 
 ## Troubleshooting
+
+### Task stuck in PENDING
+
+**Symptom:** File uploaded but separation never starts
+
+**Solution:** Check the worker container is running:
+```bash
+docker compose ps worker
+docker logs vocalremover-worker
+```
+The worker container must be running to process separation tasks.
 
 ### Build fails at Spleeter model download
 
@@ -198,54 +241,53 @@ docker stats
 
 ### Backend container exits immediately
 
-**Symptom:** `docker-compose ps` shows backend as "Exit 1"
+**Symptom:** `docker compose ps` shows backend as "Exit 1"
 
 **Solution:**
 ```bash
-docker-compose logs backend
+docker compose logs backend
 ```
 Common issues:
 - Missing `DJANGO_SECRET_KEY`
-- Port 8000 already in use
+- Port already in use
 
 ### Frontend shows 502 Bad Gateway
 
 **Symptom:** Frontend loads but API calls fail
 
 **Solution:**
-- Check backend is running: `docker-compose ps`
+- Check backend is running: `docker compose ps`
 - Check nginx config connects to correct backend hostname
-- Verify network: `docker-compose exec frontend ping backend`
+- Verify network: `docker compose exec frontend ping backend`
 
-### Models not found error
+### Database not initialized
 
-**Symptom:** `spleeter` raises model not found error
+**Symptom:** `no such table: separator_task` error
 
-**Solution:**
-- Models should be pre-baked. If missing, rebuild image:
-  ```bash
-  docker-compose build --no-cache backend
-  ```
+**Solution:** Migrations run automatically on container startup. If issues persist:
+```bash
+docker compose exec backend .venv/bin/python manage.py migrate
+```
 
 ## Updating
 
 ```bash
-# Pull latest code
-git pull
+# Pull latest images
+docker compose pull
 
-# Rebuild and restart
-docker-compose up -d --build
+# Restart with new images
+docker compose up -d
 ```
 
 ## Uninstall
 
 ```bash
 # Stop and remove containers
-docker-compose down
+docker compose down
 
 # Remove images
-docker rmi vocalremover-backend vocalremover-frontend
+docker rmi lixd96/vocalremover-backend lixd96/vocalremover-frontend
 
-# Remove volumes
-docker volume rm vocalremover_backend-media
+# Remove volumes (deletes all data)
+docker volume rm vocalremover_backend-data
 ```

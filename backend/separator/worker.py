@@ -69,6 +69,14 @@ class Worker:
         signal.signal(signal.SIGTERM, self._handle_shutdown)
         signal.signal(signal.SIGINT, self._handle_shutdown)
 
+        # Pre-load Spleeter models at startup
+        from separator.separation import _get_separator, SPLEETER_MODE_MAP
+
+        logger.info("Pre-loading Spleeter models...")
+        for preset in SPLEETER_MODE_MAP.values():
+            _get_separator(preset)
+        logger.info("All models loaded")
+
         logger.info("Worker started (poll_interval=%.1fs)", self._poll_interval)
         self._recover_stuck_tasks()
 

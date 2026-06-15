@@ -17,9 +17,19 @@ STEM_NAMES = {
     Task.Mode.FOUR_STEMS: ["vocals", "drums", "bass", "other"],
 }
 
+# Cache Separator instances by preset — load model once, reuse across tasks
+_separator_cache: dict[str, "Separator"] = {}
 
-class SeparationError(Exception):
-    """Raised when Spleeter fails to separate audio."""
+
+def _get_separator(preset: str):
+    """Get or create a cached Separator for the given preset."""
+    if preset not in _separator_cache:
+        from spleeter.separator import Separator
+
+        logger.info("Loading Spleeter model: %s", preset)
+        _separator_cache[preset] = Separator(preset)
+        logger.info("Model loaded: %s", preset)
+    return _separator_cache[preset]
 
 
 def _find_upload_file(task_id: str, media_root: Path) -> Path:
@@ -43,9 +53,7 @@ def _run_spleeter(
 
     Returns dict mapping stem names to output file paths.
     """
-    from spleeter.separator import Separator
-
-    separator = Separator(preset)
+    separator = _get_separator(preset)
     separator.separate_to_file(input_path, output_dir)
 
     input_stem = Path(input_path).stem

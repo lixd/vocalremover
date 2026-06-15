@@ -21,3 +21,5 @@ LICENSE
 .mcp.json
 .vscode
 .idea
+db.sqlite3
+backend/media
