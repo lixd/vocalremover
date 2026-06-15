@@ -19,15 +19,13 @@ RUN uv sync --no-dev
 # Copy backend source
 COPY backend/ ./
 
-# Pre-download Spleeter models
+# Pre-download Spleeter model (4stems only; 2stems is derived from it)
 RUN uv run python -c "\
 from spleeter.separator import Separator; \
 import numpy as np; \
-s2 = Separator('spleeter:2stems'); \
-s2.separate(np.random.randn(44100 * 10, 2).astype(np.float32)); \
-s4 = Separator('spleeter:4stems'); \
-s4.separate(np.random.randn(44100 * 10, 2).astype(np.float32)); \
-print('Models downloaded successfully')"
+s = Separator('spleeter:4stems'); \
+s.separate(np.random.randn(44100 * 10, 2).astype(np.float32)); \
+print('Model downloaded successfully')"
 
 # Install gunicorn for production
 RUN uv pip install gunicorn
