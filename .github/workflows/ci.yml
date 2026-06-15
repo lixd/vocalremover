@@ -43,8 +43,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/vocalremover-backend:${{ steps.sanitize.outputs.tag_name }}
             ${{ steps.sanitize.outputs.is_main == 'true' && format('{0}/vocalremover-backend:latest', secrets.DOCKERHUB_USERNAME) || '' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -55,5 +54,4 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/vocalremover-frontend:${{ steps.sanitize.outputs.tag_name }}
             ${{ steps.sanitize.outputs.is_main == 'true' && format('{0}/vocalremover-frontend:latest', secrets.DOCKERHUB_USERNAME) || '' }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
