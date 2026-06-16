@@ -111,10 +111,11 @@ def stem_stream(request, task_id, stem_name):
             end = min(end, file_size - 1)
             length = end - start + 1
 
-            fh = open(stem_path, "rb")
-            fh.seek(start)
+            with open(stem_path, "rb") as fh:
+                fh.seek(start)
+                data = fh.read(length)
             response = HttpResponse(
-                fh.read(length), status=206, content_type=content_type
+                data, status=206, content_type=content_type
             )
             response["Content-Range"] = f"bytes {start}-{end}/{file_size}"
             response["Content-Length"] = str(length)

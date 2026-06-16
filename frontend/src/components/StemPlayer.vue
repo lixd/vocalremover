@@ -41,7 +41,7 @@ function initWaveSurfer() {
 
   wavesurfer = WaveSurfer.create({
     container: waveformRef.value,
-    waveColor: STEM_COLORS[stemName] || '#00e676',
+    waveColor: STEM_COLORS[props.stemName] || '#00e676',
     progressColor: textPrimary,
     cursorColor: textPrimary,
     barWidth: 2,
