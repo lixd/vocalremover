@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
-import WaveSurfer from 'wavesurfer.js'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps<{
   stemName: string
@@ -8,14 +7,12 @@ const props = defineProps<{
   downloadUrl: string
 }>()
 
-const waveformRef = ref<HTMLElement | null>(null)
+const audioRef = ref<HTMLAudioElement | null>(null)
 const isPlaying = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
 const isLoading = ref(true)
 const hasError = ref(false)
-
-let wavesurfer: WaveSurfer | null = null
 
 const STEM_LABELS: Record<string, string> = {
   vocals: '人声',
@@ -33,40 +30,49 @@ const STEM_COLORS: Record<string, string> = {
   other: '#ffab40',
 }
 
-function initWaveSurfer() {
-  if (!waveformRef.value) return
+const stemColor = computed(() => STEM_COLORS[props.stemName] || '#00e676')
 
-  const style = getComputedStyle(document.documentElement)
-  const textPrimary = style.getPropertyValue('--color-text-primary').trim() || '#eeeeee'
-
-  wavesurfer = WaveSurfer.create({
-    container: waveformRef.value,
-    waveColor: STEM_COLORS[props.stemName] || '#00e676',
-    progressColor: textPrimary,
-    cursorColor: textPrimary,
-    barWidth: 2,
-    barGap: 1,
-    barRadius: 2,
-    height: 64,
-    normalize: true,
-  })
-
-  wavesurfer.on('ready', () => {
-    isLoading.value = false
-    duration.value = wavesurfer!.getDuration()
-  })
-
-  wavesurfer.on('play', () => { isPlaying.value = true })
-  wavesurfer.on('pause', () => { isPlaying.value = false })
-  wavesurfer.on('timeupdate', (t: number) => { currentTime.value = t })
-  wavesurfer.on('finish', () => { isPlaying.value = false })
-  wavesurfer.on('error', () => { hasError.value = true; isLoading.value = false })
-
-  wavesurfer.load(props.streamUrl)
-}
+// 进度 0-100，用于进度条宽度
+const progressPercent = computed(() => {
+  if (!duration.value) return 0
+  return (currentTime.value / duration.value) * 100
+})
 
 function togglePlay() {
-  wavesurfer?.playPause()
+  const audio = audioRef.value
+  if (!audio) return
+  if (audio.paused) {
+    audio.play()
+  } else {
+    audio.pause()
+  }
+}
+
+function onLoadedMetadata() {
+  isLoading.value = false
+  duration.value = audioRef.value?.duration ?? 0
+}
+
+function onTimeUpdate() {
+  currentTime.value = audioRef.value?.currentTime ?? 0
+}
+
+function onPlay() { isPlaying.value = true }
+function onPause() { isPlaying.value = false }
+function onEnded() { isPlaying.value = false }
+function onError() {
+  hasError.value = true
+  isLoading.value = false
+}
+
+// 点击进度条 seek
+function seekTo(event: MouseEvent) {
+  const audio = audioRef.value
+  const bar = event.currentTarget as HTMLElement
+  if (!audio || !duration.value) return
+  const rect = bar.getBoundingClientRect()
+  const ratio = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1)
+  audio.currentTime = ratio * duration.value
 }
 
 function formatTime(s: number): string {
@@ -76,21 +82,40 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-onMounted(initWaveSurfer)
-onUnmounted(() => { wavesurfer?.destroy(); wavesurfer = null })
+onMounted(() => {
+  // 触发音频元数据加载；事件监听由模板中的 @* 绑定
+  audioRef.value?.load()
+})
+
+onUnmounted(() => {
+  audioRef.value?.pause()
+})
 </script>
 
 <template>
   <div class="stem-card">
     <div class="stem-header">
       <div class="stem-label">
-        <span class="stem-dot" :style="{ background: STEM_COLORS[stemName] || '#00e676' }"></span>
+        <span class="stem-dot" :style="{ background: stemColor }"></span>
         <span class="stem-name">{{ STEM_LABELS[stemName] || stemName }}</span>
       </div>
       <a :href="downloadUrl" :download="`${stemName}.mp3`" class="download-btn" @click.stop>
         ⬇️
       </a>
     </div>
+
+    <!-- 隐藏的原生 audio 元素，实际播放由它负责 -->
+    <audio
+      ref="audioRef"
+      :src="streamUrl"
+      preload="metadata"
+      @loadedmetadata="onLoadedMetadata"
+      @timeupdate="onTimeUpdate"
+      @play="onPlay"
+      @pause="onPause"
+      @ended="onEnded"
+      @error="onError"
+    />
 
     <div v-if="isLoading" class="loading-bar">
       <div class="loading-pulse"></div>
@@ -99,7 +124,10 @@ onUnmounted(() => { wavesurfer?.destroy(); wavesurfer = null })
     <div v-else-if="hasError" class="error-text">音频加载失败</div>
 
     <div v-else class="player-body">
-      <div ref="waveformRef" class="waveform"></div>
+      <div class="progress-track" :style="{ '--stem-color': stemColor }" @click="seekTo">
+        <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+        <div class="progress-thumb" :style="{ left: progressPercent + '%' }"></div>
+      </div>
       <div class="controls">
         <button class="play-btn" @click="togglePlay">
           {{ isPlaying ? '⏸' : '▶' }}
@@ -140,7 +168,8 @@ onUnmounted(() => { wavesurfer?.destroy(); wavesurfer = null })
 .stem-name {
   font-weight: 600;
   font-size: 16px;
-  color: var(--color-text-primary);}
+  color: var(--color-text-primary);
+}
 
 .download-btn {
   font-size: 20px;
@@ -154,10 +183,40 @@ onUnmounted(() => { wavesurfer?.destroy(); wavesurfer = null })
   background: var(--color-border);
 }
 
-.waveform {
-  margin-bottom: 12px;
-  border-radius: 8px;
-  overflow: hidden;
+.player-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.progress-track {
+  position: relative;
+  height: 6px;
+  background: var(--color-border);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--stem-color, var(--color-accent));
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.progress-thumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--stem-color, var(--color-accent));
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.2);
+  transition: left 0.1s linear;
 }
 
 .controls {
@@ -193,7 +252,7 @@ onUnmounted(() => { wavesurfer?.destroy(); wavesurfer = null })
 }
 
 .loading-bar {
-  height: 64px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
