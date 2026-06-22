@@ -10,7 +10,7 @@ import { getStemStreamUrl, getStemDownloadUrl, getDownloadAllUrl } from '@/api/c
 const route = useRoute()
 const taskId = route.params.taskId as string
 
-const { task, isLoading, error, startPolling } = useTask(taskId)
+const { task, isLoading, error, elapsedSeconds, startPolling } = useTask(taskId)
 
 onMounted(startPolling)
 
@@ -37,6 +37,7 @@ const downloadAllUrl = computed(() => getDownloadAllUrl(taskId))
       v-if="task"
       :status="task.status"
       :error-message="task.error_message"
+      :elapsed-seconds="elapsedSeconds"
     />
 
     <div v-if="task?.status === 'COMPLETED'" class="stems-container">

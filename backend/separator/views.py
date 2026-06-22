@@ -2,6 +2,7 @@ import io
 import logging
 import zipfile
 from pathlib import Path
+from urllib.parse import quote
 
 from django.conf import settings
 from django.http import FileResponse, HttpResponse, JsonResponse
@@ -23,6 +24,34 @@ ALLOWED_STEM_NAMES = {
     "bass",
     "other",
 }
+
+# stem 名称 → 中文标签，用于下载文件名
+STEM_LABELS = {
+    "vocals": "人声",
+    "accompaniment": "伴奏",
+    "drums": "鼓",
+    "bass": "贝斯",
+    "other": "其他",
+}
+
+
+def _build_content_disposition(filename: str) -> str:
+    """Build a Content-Disposition header that handles non-ASCII filenames.
+
+    Uses RFC 5987 ``filename*`` so Chinese characters survive across browsers;
+    falls back to an ASCII-only ``filename`` for older clients.
+    """
+    quoted = quote(filename)
+    ascii_fallback = filename.encode("ascii", "ignore").decode("ascii") or "download"
+    return f"attachment; filename=\"{ascii_fallback}\"; filename*=UTF-8''{quoted}"
+
+
+def _stem_download_name(task: Task, stem_name: str, ext: str) -> str:
+    """Build a stem download filename like ``a-人声.mp3`` from the source name."""
+    source_stem = Path(task.original_filename).stem or "audio"
+    label = STEM_LABELS.get(stem_name, stem_name)
+    return f"{source_stem}-{label}{ext}"
+
 
 
 @api_view(["POST"])
@@ -72,13 +101,19 @@ def stem_download(request, task_id, stem_name):
     if stem_name not in ALLOWED_STEM_NAMES:
         return JsonResponse({"error": "Invalid stem name"}, status=400)
 
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return JsonResponse({"error": "Task not found"}, status=404)
+
     stem_path = _find_stem_file(str(task_id), stem_name)
     if stem_path is None:
         return JsonResponse({"error": "Stem not found"}, status=404)
 
     content_type = "audio/mpeg" if stem_path.suffix == ".mp3" else "audio/wav"
+    filename = _stem_download_name(task, stem_name, stem_path.suffix)
     response = FileResponse(open(stem_path, "rb"), content_type=content_type)
-    response["Content-Disposition"] = f'attachment; filename="{stem_name}{stem_path.suffix}"'
+    response["Content-Disposition"] = _build_content_disposition(filename)
     return response
 
 
@@ -136,16 +171,27 @@ def stem_stream(request, task_id, stem_name):
 @require_GET
 def download_all_stems(request, task_id):
     """Download all stems as a ZIP archive."""
+    try:
+        task = Task.objects.get(id=task_id)
+    except Task.DoesNotExist:
+        return JsonResponse({"error": "Task not found"}, status=404)
+
     stem_dir = Path(settings.MEDIA_ROOT) / "stems" / str(task_id)
     if not stem_dir.exists():
         return JsonResponse({"error": "Stems not found"}, status=404)
 
+    source_stem = Path(task.original_filename).stem or "audio"
+
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as zf:
         for stem_file in list(stem_dir.glob("*.mp3")) + list(stem_dir.glob("*.wav")):
-            zf.write(stem_file, stem_file.name)
+            stem_name = stem_file.stem
+            label = STEM_LABELS.get(stem_name, stem_name)
+            arcname = f"{source_stem}-{label}{stem_file.suffix}"
+            zf.write(stem_file, arcname)
     buffer.seek(0)
 
+    zip_name = f"{source_stem}-stems.zip"
     response = HttpResponse(buffer.getvalue(), content_type="application/zip")
-    response["Content-Disposition"] = f'attachment; filename="{task_id}_stems.zip"'
+    response["Content-Disposition"] = _build_content_disposition(zip_name)
     return response

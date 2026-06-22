@@ -4,6 +4,7 @@ import { computed } from 'vue'
 const props = defineProps<{
   status: string
   errorMessage?: string | null
+  elapsedSeconds?: number
 }>()
 
 const statusConfig = computed(() => {
@@ -15,6 +16,17 @@ const statusConfig = computed(() => {
     default: return { text: '加载中...', icon: '⏳', color: 'var(--color-text-secondary)' }
   }
 })
+
+// 仅在等待/处理中显示已等待时长
+const showElapsed = computed(() =>
+  props.status === 'PENDING' || props.status === 'PROCESSING'
+)
+
+function formatElapsed(s: number): string {
+  const m = Math.floor(s / 60)
+  const sec = s % 60
+  return m > 0 ? `${m}分${sec}秒` : `${sec}秒`
+}
 </script>
 
 <template>
@@ -23,6 +35,9 @@ const statusConfig = computed(() => {
       <div class="progress-icon">{{ statusConfig.icon }}</div>
       <div class="progress-text" :style="{ color: statusConfig.color }">
         {{ statusConfig.text }}
+      </div>
+      <div v-if="showElapsed && elapsedSeconds !== undefined" class="elapsed-text">
+        已等待 {{ formatElapsed(elapsedSeconds) }}
       </div>
       <div v-if="status === 'PROCESSING'" class="progress-bar">
         <div class="progress-fill"></div>
@@ -54,6 +69,13 @@ const statusConfig = computed(() => {
 .progress-text {
   font-size: 18px;
   font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.elapsed-text {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-family: monospace;
   margin-bottom: 16px;
 }
 

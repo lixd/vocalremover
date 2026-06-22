@@ -114,6 +114,8 @@ class TestStemsEndpoint:
             response = api_client.get(f"/api/tasks/{task.id}/stems/vocals/")
         assert response.status_code == 200
         assert response["Content-Disposition"].startswith("attachment")
+        # 文件名带源文件名前缀 + 中文标签（test.mp3 → test-人声.wav）
+        assert "filename*=UTF-8''test-%E4%BA%BA%E5%A3%B0.wav" in response["Content-Disposition"]
 
     def test_stem_download_not_found(self, api_client, create_task, tmp_path):
         stems = {"vocals": {"filename": "vocals.wav"}}
@@ -159,8 +161,10 @@ class TestStemsEndpoint:
             response = api_client.get(f"/api/tasks/{task.id}/stems/download-all/")
         assert response.status_code == 200
         assert response["Content-Type"] == "application/zip"
+        # ZIP 名带源文件名前缀 + UTF-8 编码（test.mp3 → test-stems.zip）
+        assert "filename*=UTF-8''test-stems.zip" in response["Content-Disposition"]
         zip_buffer = io.BytesIO(response.content)
         with zipfile.ZipFile(zip_buffer) as zf:
             names = zf.namelist()
-            assert "vocals.wav" in names
-            assert "accompaniment.wav" in names
+            assert "test-人声.wav" in names
+            assert "test-伴奏.wav" in names
